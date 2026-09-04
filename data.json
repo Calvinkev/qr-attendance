@@ -1,0 +1,19 @@
+{
+  "sessions": {
+    "17d006ec": {
+      "id": "17d006ec",
+      "title": "KALI",
+      "createdAt": 1788501438199,
+      "expiresAt": 1788508638199,
+      "attendance": []
+    },
+    "70bcf4c9": {
+      "id": "70bcf4c9",
+      "title": "Test Lecture",
+      "createdAt": 1788501936474,
+      "expiresAt": 1788509136474,
+      "durationMinutes": 120,
+      "attendance": []
+    }
+  }
+}

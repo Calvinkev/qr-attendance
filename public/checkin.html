@@ -3,86 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Check In</title>
-<style>
-  :root {
-    --bg: #0d0d0f;
-    --panel: #17171a;
-    --border: #2a2a2e;
-    --gold: #c9a24b;
-    --text: #eee8dd;
-    --muted: #9a948a;
-    --green: #4caf7d;
-    --red: #d16a6a;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    padding: 20px;
-  }
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 28px 24px;
-    width: 100%;
-    max-width: 380px;
-    text-align: center;
-  }
-  .icon { font-size: 40px; margin-bottom: 8px; }
-  h1 { font-size: 18px; margin: 0 0 4px; }
-  .session-title { color: var(--gold); font-size: 15px; margin-bottom: 20px; }
-  label { display: block; text-align: left; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-  input {
-    width: 100%;
-    background: #0d0d0f;
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 12px;
-    border-radius: 8px;
-    font-size: 15px;
-    margin-bottom: 14px;
-  }
-  input:focus { outline: none; border-color: var(--gold); }
-  button {
-    width: 100%;
-    background: var(--gold);
-    color: #1a1a1a;
-    border: none;
-    padding: 13px;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 15px;
-    cursor: pointer;
-  }
-  button:disabled { opacity: 0.6; }
-  .msg { margin-top: 16px; font-size: 14px; padding: 10px; border-radius: 8px; display: none; }
-  .msg.success { background: rgba(76,175,125,0.12); color: var(--green); display: block; }
-  .msg.error { background: rgba(209,106,106,0.12); color: var(--red); display: block; }
-</style>
+<title>Check In — QR Attendance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
-<body>
-<div class="card">
-  <div class="icon" id="icon">✅</div>
+<body class="checkin-body">
+
+<div class="checkin-card">
+  <div class="checkin-icon" id="icon">✅</div>
   <h1 id="heading">Session Check-In</h1>
-  <div class="session-title" id="sessionTitle">Loading session…</div>
+  <div class="checkin-session" id="sessionTitle">Loading session…</div>
+  <div class="checkin-timer" id="timerText"></div>
 
   <form id="form">
-    <label>Full Name</label>
-    <input id="name" placeholder="e.g. Calvin Bukenya" required />
-    <label>Registration Number</label>
-    <input id="regNumber" placeholder="e.g. 2024/BSE/049/PS" required />
-    <button type="submit" id="submitBtn">Mark Me Present</button>
+    <label for="name">Full Name</label>
+    <input id="name" placeholder="e.g. Calvin Bukenya" required autocomplete="name">
+    <label for="regNumber">Registration Number</label>
+    <input id="regNumber" placeholder="e.g. 2024/BSE/049/PS" required autocomplete="off">
+    <button type="submit" id="submitBtn" class="checkin-btn">Mark Me Present</button>
   </form>
 
-  <div class="msg" id="msg"></div>
+  <div class="checkin-msg" id="msg"></div>
 </div>
 
 <script>
@@ -92,37 +34,83 @@ const form = document.getElementById('form');
 const msg = document.getElementById('msg');
 const submitBtn = document.getElementById('submitBtn');
 const sessionTitleEl = document.getElementById('sessionTitle');
+const timerEl = document.getElementById('timerText');
+let sessionExpiresAt = null;
+let timerInterval = null;
 
 async function loadSession() {
   if (!sessionId) {
     sessionTitleEl.textContent = 'No session specified.';
     form.style.display = 'none';
+    document.getElementById('icon').textContent = '❌';
     return;
   }
-  const res = await fetch('/api/sessions/' + sessionId);
-  const data = await res.json();
-  if (!res.ok) {
-    sessionTitleEl.textContent = 'Session not found.';
+  try {
+    const res = await fetch('/api/sessions/' + sessionId);
+    const data = await res.json();
+    if (!res.ok) {
+      sessionTitleEl.textContent = 'Session not found.';
+      form.style.display = 'none';
+      document.getElementById('icon').textContent = '❌';
+      return;
+    }
+    sessionTitleEl.textContent = data.title;
+    sessionExpiresAt = data.expiresAt;
+
+    if (Date.now() > data.expiresAt) {
+      form.style.display = 'none';
+      document.getElementById('icon').textContent = '⏰';
+      document.getElementById('heading').textContent = 'Session Closed';
+      msg.className = 'checkin-msg error';
+      msg.textContent = 'This attendance session has ended. Contact your instructor if you need help.';
+      timerEl.textContent = 'Expired';
+      return;
+    }
+
+    startTimer();
+
+    // Restore name/reg from localStorage for returning students
+    const savedName = localStorage.getItem('qr_att_name');
+    const savedReg = localStorage.getItem('qr_att_reg');
+    if (savedName) document.getElementById('name').value = savedName;
+    if (savedReg) document.getElementById('regNumber').value = savedReg;
+  } catch {
+    sessionTitleEl.textContent = 'Could not connect to server.';
     form.style.display = 'none';
-    return;
+    document.getElementById('icon').textContent = '🔌';
   }
-  sessionTitleEl.textContent = data.title;
-  if (Date.now() > data.expiresAt) {
-    form.style.display = 'none';
-    msg.className = 'msg error';
-    msg.textContent = 'This attendance session has closed.';
+}
+
+function startTimer() {
+  function tick() {
+    const remaining = sessionExpiresAt - Date.now();
+    if (remaining <= 0) {
+      timerEl.textContent = 'Session just closed';
+      timerEl.style.color = 'var(--red)';
+      clearInterval(timerInterval);
+      return;
+    }
+    const m = Math.floor(remaining / 60000);
+    const s = Math.floor((remaining % 60000) / 1000);
+    timerEl.textContent = `${m}m ${s < 10 ? '0' : ''}${s}s remaining to check in`;
   }
+  tick();
+  timerInterval = setInterval(tick, 1000);
 }
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   submitBtn.disabled = true;
   submitBtn.textContent = 'Submitting…';
-  msg.className = 'msg';
+  msg.className = 'checkin-msg';
   msg.textContent = '';
 
   const name = document.getElementById('name').value.trim();
   const regNumber = document.getElementById('regNumber').value.trim();
+
+  // Save for next time
+  localStorage.setItem('qr_att_name', name);
+  localStorage.setItem('qr_att_reg', regNumber);
 
   try {
     const res = await fetch('/api/checkin/' + sessionId, {
@@ -132,19 +120,20 @@ form.addEventListener('submit', async (e) => {
     });
     const data = await res.json();
     if (res.ok) {
-      msg.className = 'msg success';
+      msg.className = 'checkin-msg success';
       msg.textContent = data.message;
       form.style.display = 'none';
       document.getElementById('icon').textContent = '🎉';
+      document.getElementById('heading').textContent = 'You\'re In!';
     } else {
-      msg.className = 'msg error';
+      msg.className = 'checkin-msg error';
       msg.textContent = data.error || 'Something went wrong.';
       submitBtn.disabled = false;
       submitBtn.textContent = 'Mark Me Present';
     }
-  } catch (err) {
-    msg.className = 'msg error';
-    msg.textContent = 'Network error. Please try again.';
+  } catch {
+    msg.className = 'checkin-msg error';
+    msg.textContent = 'Network error. Check your connection and try again.';
     submitBtn.disabled = false;
     submitBtn.textContent = 'Mark Me Present';
   }

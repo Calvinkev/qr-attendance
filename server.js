@@ -7,14 +7,16 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, 'data.json');
+const ADMIN_PIN = process.env.ADMIN_PIN || '1234';
+
+// SSE clients
+let sseClients = {};
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/', (req, res) => {
-  res.redirect('/admin.html');
-});
-
+// ── Database helpers ──────────────────────────────────────────────
 function loadDB() {
   if (!fs.existsSync(DB_FILE)) {
     fs.writeFileSync(DB_FILE, JSON.stringify({ sessions: {} }, null, 2));
@@ -32,9 +34,33 @@ function getBaseUrl(req) {
   return `${protocol}://${host}`;
 }
 
+// ── SSE broadcast ─────────────────────────────────────────────────
+function broadcast(sessionId, event, data) {
+  const clients = sseClients[sessionId] || [];
+  clients.forEach(res => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  });
+}
+
+// ── Routes ────────────────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.redirect('/admin.html');
+});
+
+// Admin PIN validation
+app.post('/api/auth', (req, res) => {
+  const { pin } = req.body;
+  if (pin === ADMIN_PIN) {
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ error: 'Invalid PIN' });
+  }
+});
+
 // Create a new session
 app.post('/api/sessions', async (req, res) => {
-  const { title, durationMinutes } = req.body;
+  const { title, durationMinutes, pin } = req.body;
+  if (pin !== ADMIN_PIN) return res.status(401).json({ error: 'Invalid admin PIN' });
   if (!title || !title.trim()) {
     return res.status(400).json({ error: 'Session title is required' });
   }
@@ -50,6 +76,7 @@ app.post('/api/sessions', async (req, res) => {
     title: title.trim(),
     createdAt,
     expiresAt,
+    durationMinutes: duration,
     attendance: []
   };
   saveDB(db);
@@ -57,7 +84,7 @@ app.post('/api/sessions', async (req, res) => {
   const checkinUrl = `${getBaseUrl(req)}/checkin.html?id=${id}`;
   const qrDataUrl = await qrcode.toDataURL(checkinUrl, { width: 400, margin: 2 });
 
-  res.json({ id, title: db.sessions[id].title, checkinUrl, qrDataUrl, expiresAt, createdAt });
+  res.json({ id, title: db.sessions[id].title, checkinUrl, qrDataUrl, expiresAt, createdAt, durationMinutes: duration });
 });
 
 // List all sessions (most recent first)
@@ -70,6 +97,7 @@ app.get('/api/sessions', (req, res) => {
       title: s.title,
       createdAt: s.createdAt,
       expiresAt: s.expiresAt,
+      durationMinutes: s.durationMinutes || 120,
       count: s.attendance.length
     }));
   res.json(list);
@@ -83,6 +111,51 @@ app.get('/api/sessions/:id', (req, res) => {
   res.json(session);
 });
 
+// Delete a session
+app.delete('/api/sessions/:id', (req, res) => {
+  const { pin } = req.body;
+  if (pin !== ADMIN_PIN) return res.status(401).json({ error: 'Invalid admin PIN' });
+
+  const db = loadDB();
+  if (!db.sessions[req.params.id]) return res.status(404).json({ error: 'Session not found' });
+  delete db.sessions[req.params.id];
+  saveDB(db);
+  res.json({ success: true });
+});
+
+// Extend session duration
+app.patch('/api/sessions/:id/extend', (req, res) => {
+  const { pin, additionalMinutes } = req.body;
+  if (pin !== ADMIN_PIN) return res.status(401).json({ error: 'Invalid admin PIN' });
+
+  const db = loadDB();
+  const session = db.sessions[req.params.id];
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+
+  const extra = additionalMinutes && additionalMinutes > 0 ? Number(additionalMinutes) : 30;
+  session.expiresAt += extra * 60 * 1000;
+  saveDB(db);
+
+  broadcast(req.params.id, 'extended', { expiresAt: session.expiresAt });
+  res.json({ success: true, expiresAt: session.expiresAt });
+});
+
+// Close session immediately
+app.patch('/api/sessions/:id/close', (req, res) => {
+  const { pin } = req.body;
+  if (pin !== ADMIN_PIN) return res.status(401).json({ error: 'Invalid admin PIN' });
+
+  const db = loadDB();
+  const session = db.sessions[req.params.id];
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+
+  session.expiresAt = Date.now();
+  saveDB(db);
+
+  broadcast(req.params.id, 'closed', { expiresAt: session.expiresAt });
+  res.json({ success: true });
+});
+
 // Get/regenerate the QR + checkin link for a session (host-aware)
 app.get('/api/sessions/:id/qr', async (req, res) => {
   const db = loadDB();
@@ -92,6 +165,24 @@ app.get('/api/sessions/:id/qr', async (req, res) => {
   const checkinUrl = `${getBaseUrl(req)}/checkin.html?id=${session.id}`;
   const qrDataUrl = await qrcode.toDataURL(checkinUrl, { width: 400, margin: 2 });
   res.json({ checkinUrl, qrDataUrl });
+});
+
+// SSE: live attendance stream
+app.get('/api/sessions/:id/stream', (req, res) => {
+  const sessionId = req.params.id;
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+  res.write('\n');
+
+  if (!sseClients[sessionId]) sseClients[sessionId] = [];
+  sseClients[sessionId].push(res);
+
+  req.on('close', () => {
+    sseClients[sessionId] = (sseClients[sessionId] || []).filter(c => c !== res);
+  });
 });
 
 // Student check-in
@@ -121,13 +212,23 @@ app.post('/api/checkin/:id', (req, res) => {
 
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
 
-  session.attendance.push({
+  const entry = {
     name: name.trim(),
     regNumber: regNumber.trim(),
     timestamp: Date.now(),
     ip
-  });
+  };
+
+  session.attendance.push(entry);
   saveDB(db);
+
+  // Broadcast to admin SSE clients
+  broadcast(req.params.id, 'checkin', {
+    name: entry.name,
+    regNumber: entry.regNumber,
+    timestamp: entry.timestamp,
+    count: session.attendance.length
+  });
 
   res.json({ success: true, message: `Welcome ${name.trim()}, you're marked present!` });
 });
@@ -138,12 +239,12 @@ app.get('/api/sessions/:id/export', (req, res) => {
   const session = db.sessions[req.params.id];
   if (!session) return res.status(404).json({ error: 'Session not found' });
 
-  let csv = 'Name,Registration Number,Time\n';
+  let csv = 'No.,Name,Registration Number,Time\n';
   session.attendance
     .sort((a, b) => a.timestamp - b.timestamp)
-    .forEach(a => {
+    .forEach((a, i) => {
       const time = new Date(a.timestamp).toLocaleString();
-      csv += `"${a.name.replace(/"/g, '""')}","${a.regNumber.replace(/"/g, '""')}","${time}"\n`;
+      csv += `${i + 1},"${a.name.replace(/"/g, '""')}","${a.regNumber.replace(/"/g, '""')}","${time}"\n`;
     });
 
   const safeTitle = session.title.replace(/[^a-z0-9]/gi, '_');
@@ -152,7 +253,27 @@ app.get('/api/sessions/:id/export', (req, res) => {
   res.send(csv);
 });
 
+// Dashboard stats
+app.get('/api/stats', (req, res) => {
+  const db = loadDB();
+  const sessions = Object.values(db.sessions);
+  const now = Date.now();
+  const totalSessions = sessions.length;
+  const activeSessions = sessions.filter(s => now < s.expiresAt).length;
+  const totalCheckins = sessions.reduce((sum, s) => sum + s.attendance.length, 0);
+  const todaySessions = sessions.filter(s => {
+    const d = new Date(s.createdAt);
+    const t = new Date();
+    return d.toDateString() === t.toDateString();
+  }).length;
+
+  res.json({ totalSessions, activeSessions, totalCheckins, todaySessions });
+});
+
 app.listen(PORT, () => {
-  console.log(`QR Attendance server running on http://localhost:${PORT}`);
-  console.log(`Admin panel: http://localhost:${PORT}/admin.html`);
+  console.log(`\n  ┌─────────────────────────────────────────┐`);
+  console.log(`  │  QR Attendance System                    │`);
+  console.log(`  │  Running on http://localhost:${PORT}        │`);
+  console.log(`  │  Admin PIN: ${ADMIN_PIN}                        │`);
+  console.log(`  └─────────────────────────────────────────┘\n`);
 });
