@@ -3,6 +3,19 @@ const qrcode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const os = require('os');
+
+function getLocalIP() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return '127.0.0.1';
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -270,10 +283,25 @@ app.get('/api/stats', (req, res) => {
   res.json({ totalSessions, activeSessions, totalCheckins, todaySessions });
 });
 
+// Network info for admin UI
+app.get('/api/network-info', (req, res) => {
+  const localIP = getLocalIP();
+  res.json({
+    localIP,
+    lanUrl: `http://${localIP}:${PORT}`,
+    adminUrl: `http://${localIP}:${PORT}/admin.html`
+  });
+});
+
 app.listen(PORT, () => {
-  console.log(`\n  ┌─────────────────────────────────────────┐`);
-  console.log(`  │  QR Attendance System                    │`);
-  console.log(`  │  Running on http://localhost:${PORT}        │`);
-  console.log(`  │  Admin PIN: ${ADMIN_PIN}                        │`);
-  console.log(`  └─────────────────────────────────────────┘\n`);
+  const localIP = getLocalIP();
+  console.log(`\n  ┌──────────────────────────────────────────────┐`);
+  console.log(`  │  QR Attendance System                         │`);
+  console.log(`  │  Local:   http://localhost:${PORT}               │`);
+  console.log(`  │  Network: http://${localIP}:${PORT}    │`);
+  console.log(`  │  Admin PIN: ${ADMIN_PIN}                           │`);
+  console.log(`  │                                                │`);
+  console.log(`  │  ⚠  Open admin using the Network URL so       │`);
+  console.log(`  │     QR codes work for phones on your WiFi!     │`);
+  console.log(`  └──────────────────────────────────────────────┘\n`);
 });

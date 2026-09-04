@@ -36,6 +36,14 @@
     <button class="btn-icon" onclick="logout()" title="Lock">🔒</button>
   </header>
 
+  <!-- Network Warning Banner -->
+  <div class="network-banner" id="networkBanner" style="display:none">
+    <div class="network-banner-inner">
+      <span>⚠️ You're on <strong>localhost</strong> — QR codes won't work on phones. Open this URL instead:</span>
+      <a id="networkUrl" href="#" class="network-link" target="_blank"></a>
+    </div>
+  </div>
+
   <!-- Stats Row -->
   <div class="stats-grid" id="statsGrid">
     <div class="stat-card">
@@ -133,6 +141,21 @@ let timerInterval = null;
 let currentSession = null;
 let allAttendees = [];
 
+// ── Network Check ─────────────────────────────────────────────
+async function checkNetwork() {
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    try {
+      const res = await fetch('/api/network-info');
+      const info = await res.json();
+      const banner = document.getElementById('networkBanner');
+      const link = document.getElementById('networkUrl');
+      link.href = info.adminUrl;
+      link.textContent = info.adminUrl;
+      banner.style.display = 'block';
+    } catch(e) {}
+  }
+}
+
 // ── Auth ──────────────────────────────────────────────────────
 function authenticate() {
   const pin = document.getElementById('pinInput').value;
@@ -149,6 +172,7 @@ function authenticate() {
       document.getElementById('app').style.display = 'block';
       loadStats();
       loadHistory();
+      checkNetwork();
     } else {
       document.getElementById('pinError').textContent = 'Wrong PIN. Try again.';
       document.getElementById('pinInput').value = '';
