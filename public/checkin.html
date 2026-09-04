@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Check In — QR Attendance</title>
+<meta name="description" content="Scan the QR code to mark your attendance">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0a0a0c">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -30,6 +33,7 @@
 <script>
 const params = new URLSearchParams(window.location.search);
 const sessionId = params.get('id');
+const qrToken = params.get('t');
 const form = document.getElementById('form');
 const msg = document.getElementById('msg');
 const submitBtn = document.getElementById('submitBtn');
@@ -37,7 +41,29 @@ const sessionTitleEl = document.getElementById('sessionTitle');
 const timerEl = document.getElementById('timerText');
 let sessionExpiresAt = null;
 let timerInterval = null;
+let userGeo = null;
 
+// ── Device fingerprint ────────────────────────────────────────
+function getDeviceId() {
+  let id = localStorage.getItem('qr_att_device');
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem('qr_att_device', id);
+  }
+  return id;
+}
+
+// ── Geolocation ───────────────────────────────────────────────
+function requestGeo() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    pos => { userGeo = { lat: pos.coords.latitude, lng: pos.coords.longitude }; },
+    () => {},
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+// ── Load session ──────────────────────────────────────────────
 async function loadSession() {
   if (!sessionId) {
     sessionTitleEl.textContent = 'No session specified.';
@@ -62,14 +88,15 @@ async function loadSession() {
       document.getElementById('icon').textContent = '⏰';
       document.getElementById('heading').textContent = 'Session Closed';
       msg.className = 'checkin-msg error';
-      msg.textContent = 'This attendance session has ended. Contact your instructor if you need help.';
+      msg.textContent = 'This attendance session has ended.';
       timerEl.textContent = 'Expired';
       return;
     }
 
-    startTimer();
+    // Request geolocation if session has geo requirement
+    if (data.geo) requestGeo();
 
-    // Restore name/reg from localStorage for returning students
+    startTimer();
     const savedName = localStorage.getItem('qr_att_name');
     const savedReg = localStorage.getItem('qr_att_reg');
     if (savedName) document.getElementById('name').value = savedName;
@@ -92,7 +119,7 @@ function startTimer() {
     }
     const m = Math.floor(remaining / 60000);
     const s = Math.floor((remaining % 60000) / 1000);
-    timerEl.textContent = `${m}m ${s < 10 ? '0' : ''}${s}s remaining to check in`;
+    timerEl.textContent = `${m}m ${s < 10 ? '0' : ''}${s}s remaining`;
   }
   tick();
   timerInterval = setInterval(tick, 1000);
@@ -108,15 +135,17 @@ form.addEventListener('submit', async (e) => {
   const name = document.getElementById('name').value.trim();
   const regNumber = document.getElementById('regNumber').value.trim();
 
-  // Save for next time
   localStorage.setItem('qr_att_name', name);
   localStorage.setItem('qr_att_reg', regNumber);
+
+  const body = { name, regNumber, token: qrToken || '', deviceId: getDeviceId() };
+  if (userGeo) { body.geoLat = userGeo.lat; body.geoLng = userGeo.lng; }
 
   try {
     const res = await fetch('/api/checkin/' + sessionId, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, regNumber })
+      body: JSON.stringify(body)
     });
     const data = await res.json();
     if (res.ok) {
@@ -124,7 +153,7 @@ form.addEventListener('submit', async (e) => {
       msg.textContent = data.message;
       form.style.display = 'none';
       document.getElementById('icon').textContent = '🎉';
-      document.getElementById('heading').textContent = 'You\'re In!';
+      document.getElementById('heading').textContent = "You're In!";
     } else {
       msg.className = 'checkin-msg error';
       msg.textContent = data.error || 'Something went wrong.';
@@ -140,6 +169,11 @@ form.addEventListener('submit', async (e) => {
 });
 
 loadSession();
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>

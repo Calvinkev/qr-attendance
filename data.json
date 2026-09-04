@@ -22,6 +22,18 @@
       "expiresAt": 1788510015728,
       "durationMinutes": 120,
       "attendance": []
+    },
+    "13da1dbc": {
+      "id": "13da1dbc",
+      "title": "Week 6 Lecture",
+      "createdAt": 1788504761808,
+      "expiresAt": 1788511961808,
+      "durationMinutes": 120,
+      "courseId": null,
+      "geo": null,
+      "attendance": []
     }
-  }
+  },
+  "courses": {},
+  "students": {}
 }

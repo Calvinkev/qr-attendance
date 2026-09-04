@@ -9,7 +9,6 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
 <!-- PIN Gate -->
 <div id="pinGate" class="gate-overlay">
   <div class="gate-card">
@@ -24,7 +23,6 @@
 
 <!-- Main App -->
 <div id="app" style="display:none">
-  <!-- Header -->
   <header class="header">
     <div class="header-left">
       <div class="logo">📋</div>
@@ -33,424 +31,153 @@
         <p class="header-sub">Manage sessions & track check-ins in real time</p>
       </div>
     </div>
-    <button class="btn-icon" onclick="logout()" title="Lock">🔒</button>
+    <div style="display:flex;gap:8px">
+      <!-- Tab navigation -->
+      <button class="btn-icon tab-btn active" onclick="switchTab('dashboard')" title="Dashboard" id="tabDash">📊</button>
+      <button class="btn-icon tab-btn" onclick="switchTab('courses')" title="Courses & Students" id="tabCourses">🎓</button>
+      <button class="btn-icon tab-btn" onclick="switchTab('reports')" title="Reports" id="tabReports">📈</button>
+      <button class="btn-icon" onclick="logout()" title="Lock">🔒</button>
+    </div>
   </header>
 
-  <!-- Network Warning Banner -->
   <div class="network-banner" id="networkBanner" style="display:none">
     <div class="network-banner-inner">
-      <span>⚠️ You're on <strong>localhost</strong> — QR codes won't work on phones. Open this URL instead:</span>
+      <span>⚠️ You're on <strong>localhost</strong> — QR codes won't work on phones. Use:</span>
       <a id="networkUrl" href="#" class="network-link" target="_blank"></a>
     </div>
   </div>
 
-  <!-- Stats Row -->
-  <div class="stats-grid" id="statsGrid">
-    <div class="stat-card">
-      <div class="stat-value" id="statTotal">0</div>
-      <div class="stat-label">Total Sessions</div>
+  <!-- ═══ DASHBOARD TAB ═══ -->
+  <div id="tabDashboard" class="tab-content">
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total Sessions</div></div>
+      <div class="stat-card accent"><div class="stat-value" id="statActive">0</div><div class="stat-label">Active Now</div></div>
+      <div class="stat-card"><div class="stat-value" id="statCheckins">0</div><div class="stat-label">Total Check-ins</div></div>
+      <div class="stat-card"><div class="stat-value" id="statToday">0</div><div class="stat-label">Today</div></div>
     </div>
-    <div class="stat-card accent">
-      <div class="stat-value" id="statActive">0</div>
-      <div class="stat-label">Active Now</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value" id="statCheckins">0</div>
-      <div class="stat-label">Total Check-ins</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value" id="statToday">0</div>
-      <div class="stat-label">Today's Sessions</div>
-    </div>
-  </div>
 
-  <!-- Create Session -->
-  <div class="card" id="createCard">
-    <h2 class="card-title">✨ New Session</h2>
-    <div class="form-row">
-      <div class="form-group flex-1">
-        <label>Session Title</label>
-        <input id="title" placeholder="e.g. SENG 421 — Week 6 Lecture">
+    <div class="card" id="createCard">
+      <h2 class="card-title">✨ New Session</h2>
+      <div class="form-row">
+        <div class="form-group flex-1"><label>Session Title</label><input id="title" placeholder="e.g. SENG 421 — Week 6"></div>
       </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Duration (minutes)</label>
-        <input id="duration" type="number" value="120" min="5" max="1440">
-      </div>
-      <button class="btn-primary" onclick="createSession()">Generate QR Code</button>
-    </div>
-  </div>
-
-  <!-- Active Session View -->
-  <div class="card" id="activeCard" style="display:none">
-    <div class="active-header">
-      <div>
-        <h2 class="card-title" id="activeTitle">Session</h2>
-        <div class="timer-row">
-          <span class="badge" id="statusBadge">● LIVE</span>
-          <span class="timer" id="timerText">--:--</span>
+      <div class="form-row">
+        <div class="form-group"><label>Duration (min)</label><input id="duration" type="number" value="120" min="5"></div>
+        <div class="form-group"><label>Course (optional)</label>
+          <select id="sessionCourse" class="select-input"><option value="">— None —</option></select>
         </div>
       </div>
-      <div class="active-actions">
-        <button class="btn-sm" onclick="extendSession()" title="Add 30 min">➕ Extend</button>
-        <button class="btn-sm btn-danger" onclick="closeSession()" title="Close now">⏹ Close</button>
+      <div class="form-row" style="margin-top:8px">
+        <label class="checkbox-label"><input type="checkbox" id="enableGeo"> 📍 Require location (students must be nearby)</label>
+      </div>
+      <div id="geoFields" style="display:none" class="form-row">
+        <div class="form-group"><label>Radius (meters)</label><input id="geoRadius" type="number" value="100" min="10"></div>
+        <button class="btn-outline" onclick="captureMyLocation()" type="button">📍 Use my location</button>
+      </div>
+      <input type="hidden" id="geoLat"><input type="hidden" id="geoLng">
+      <div class="form-row" style="margin-top:12px">
+        <button class="btn-primary" onclick="createSession()">Generate QR Code</button>
       </div>
     </div>
 
-    <div class="qr-section">
-      <div class="qr-frame">
-        <img id="qrImg" src="" alt="QR Code">
-      </div>
-      <div class="qr-link" id="linkBox"></div>
-      <div class="qr-actions">
-        <button class="btn-outline" onclick="copyLink()">📋 Copy Link</button>
-        <button class="btn-outline" onclick="exportCsv()">⬇ Export CSV</button>
-        <button class="btn-outline" onclick="goHome()">+ New Session</button>
-      </div>
-    </div>
-
-    <div class="attendance-section">
-      <div class="attendance-header">
+    <div class="card" id="activeCard" style="display:none">
+      <div class="active-header">
         <div>
-          <span class="att-count" id="countNum">0</span>
-          <span class="att-label">checked in</span>
+          <h2 class="card-title" id="activeTitle">Session</h2>
+          <div class="timer-row">
+            <span class="badge" id="statusBadge">● LIVE</span>
+            <span class="timer" id="timerText">--:--</span>
+          </div>
         </div>
-        <input type="text" class="search-input" id="searchInput" placeholder="Search attendees..." oninput="filterAttendees()">
+        <div class="active-actions">
+          <button class="btn-sm" onclick="openProjector()" title="Projector mode">📺 Project</button>
+          <button class="btn-sm" onclick="extendSession()">➕ Extend</button>
+          <button class="btn-sm btn-danger" onclick="closeSession()">⏹ Close</button>
+        </div>
       </div>
-      <ul class="attendee-list" id="attendeeList">
-        <li class="empty-state">Waiting for check-ins…</li>
-      </ul>
+      <div class="qr-section">
+        <div class="qr-frame"><img id="qrImg" src="" alt="QR Code"></div>
+        <div class="qr-rotate-info" id="qrRotateInfo">QR refreshes every 30s — anti-screenshot protection</div>
+        <div class="qr-link" id="linkBox"></div>
+        <div class="qr-actions">
+          <button class="btn-outline" onclick="copyLink()">📋 Copy Link</button>
+          <button class="btn-outline" onclick="printQR()">🖨 Print QR</button>
+          <button class="btn-outline" onclick="exportCsv()">⬇ Export CSV</button>
+          <button class="btn-outline" onclick="goHome()">+ New Session</button>
+        </div>
+      </div>
+      <div class="attendance-section">
+        <div class="attendance-header">
+          <div><span class="att-count" id="countNum">0</span><span class="att-label">checked in</span></div>
+          <input type="text" class="search-input" id="searchInput" placeholder="Search…" oninput="filterAttendees()">
+        </div>
+        <ul class="attendee-list" id="attendeeList"><li class="empty-state">Waiting for check-ins…</li></ul>
+      </div>
+    </div>
+
+    <div class="card" id="historyCard">
+      <h2 class="card-title">📁 Session History</h2>
+      <div id="historyList"><div class="empty-state">Loading…</div></div>
     </div>
   </div>
 
-  <!-- Session History -->
-  <div class="card" id="historyCard">
-    <h2 class="card-title">📁 Session History</h2>
-    <div id="historyList"><div class="empty-state">Loading…</div></div>
+  <!-- ═══ COURSES TAB ═══ -->
+  <div id="tabCourses" class="tab-content" style="display:none">
+    <div class="card">
+      <h2 class="card-title">🎓 Courses</h2>
+      <div class="form-row" style="margin-bottom:16px">
+        <div class="form-group"><label>Course Name</label><input id="courseName" placeholder="e.g. Software Engineering"></div>
+        <div class="form-group"><label>Code</label><input id="courseCode" placeholder="e.g. SENG 421"></div>
+        <button class="btn-primary" onclick="addCourse()">Add</button>
+      </div>
+      <div id="courseList"></div>
+    </div>
+    <div class="card">
+      <h2 class="card-title">👥 Student Registry</h2>
+      <div class="form-row" style="margin-bottom:8px">
+        <div class="form-group"><label>Course</label>
+          <select id="studentCourse" class="select-input" onchange="loadStudents()"><option value="">All courses</option></select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:16px">
+        <div class="form-group"><label>Name</label><input id="studentName" placeholder="Full name"></div>
+        <div class="form-group"><label>Reg Number</label><input id="studentReg" placeholder="Reg number"></div>
+        <button class="btn-primary" onclick="addStudent()">Add</button>
+      </div>
+      <div class="form-row" style="margin-bottom:16px">
+        <button class="btn-outline" onclick="showBulkImport()">📄 Bulk Import (CSV)</button>
+      </div>
+      <div id="bulkImportArea" style="display:none;margin-bottom:16px">
+        <textarea id="bulkCsv" class="textarea-input" rows="5" placeholder="Paste CSV: Name,RegNumber (one per line)"></textarea>
+        <button class="btn-primary" style="margin-top:8px" onclick="bulkImport()">Import</button>
+      </div>
+      <div id="studentList"></div>
+    </div>
+  </div>
+
+  <!-- ═══ REPORTS TAB ═══ -->
+  <div id="tabReportContent" class="tab-content" style="display:none">
+    <div class="card">
+      <h2 class="card-title">📈 Attendance Reports</h2>
+      <div class="form-row" style="margin-bottom:16px">
+        <div class="form-group"><label>Select Course</label>
+          <select id="reportCourse" class="select-input" onchange="loadReport()"><option value="">— Select —</option></select>
+        </div>
+      </div>
+      <div id="reportContent"></div>
+    </div>
+    <div class="card">
+      <h2 class="card-title">🔍 Student Lookup</h2>
+      <div class="form-row" style="margin-bottom:16px">
+        <div class="form-group"><label>Registration Number</label><input id="lookupReg" placeholder="e.g. 2024/BSE/049/PS"></div>
+        <button class="btn-primary" onclick="lookupStudent()">Search</button>
+      </div>
+      <div id="lookupResult"></div>
+    </div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
-
-<script>
-let adminPin = null;
-let currentId = null;
-let sseSource = null;
-let timerInterval = null;
-let currentSession = null;
-let allAttendees = [];
-
-// ── Network Check ─────────────────────────────────────────────
-async function checkNetwork() {
-  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-    try {
-      const res = await fetch('/api/network-info');
-      const info = await res.json();
-      const banner = document.getElementById('networkBanner');
-      const link = document.getElementById('networkUrl');
-      link.href = info.adminUrl;
-      link.textContent = info.adminUrl;
-      banner.style.display = 'block';
-    } catch(e) {}
-  }
-}
-
-// ── Auth ──────────────────────────────────────────────────────
-function authenticate() {
-  const pin = document.getElementById('pinInput').value;
-  if (!pin) return;
-  fetch('/api/auth', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin })
-  }).then(r => r.json()).then(data => {
-    if (data.success) {
-      adminPin = pin;
-      sessionStorage.setItem('pin', pin);
-      document.getElementById('pinGate').classList.add('hidden');
-      document.getElementById('app').style.display = 'block';
-      loadStats();
-      loadHistory();
-      checkNetwork();
-    } else {
-      document.getElementById('pinError').textContent = 'Wrong PIN. Try again.';
-      document.getElementById('pinInput').value = '';
-      document.getElementById('pinInput').focus();
-    }
-  });
-}
-
-document.getElementById('pinInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') authenticate();
-});
-
-function logout() {
-  adminPin = null;
-  sessionStorage.removeItem('pin');
-  document.getElementById('pinGate').classList.remove('hidden');
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('pinInput').value = '';
-  goHome();
-}
-
-// Auto-login from session
-(function() {
-  const saved = sessionStorage.getItem('pin');
-  if (saved) {
-    document.getElementById('pinInput').value = saved;
-    authenticate();
-  }
-})();
-
-// ── Stats ─────────────────────────────────────────────────────
-async function loadStats() {
-  const res = await fetch('/api/stats');
-  const s = await res.json();
-  animateNumber('statTotal', s.totalSessions);
-  animateNumber('statActive', s.activeSessions);
-  animateNumber('statCheckins', s.totalCheckins);
-  animateNumber('statToday', s.todaySessions);
-}
-
-function animateNumber(id, target) {
-  const el = document.getElementById(id);
-  const current = parseInt(el.textContent) || 0;
-  if (current === target) return;
-  const step = target > current ? 1 : -1;
-  let val = current;
-  const iv = setInterval(() => {
-    val += step;
-    el.textContent = val;
-    if (val === target) clearInterval(iv);
-  }, 40);
-}
-
-// ── Toast ─────────────────────────────────────────────────────
-function showToast(msg, type = 'info') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show ' + type;
-  setTimeout(() => t.className = 'toast', 3500);
-}
-
-// ── Create Session ────────────────────────────────────────────
-async function createSession() {
-  const title = document.getElementById('title').value.trim();
-  const duration = document.getElementById('duration').value;
-  if (!title) { showToast('Enter a session title', 'error'); return; }
-
-  const res = await fetch('/api/sessions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, durationMinutes: duration, pin: adminPin })
-  });
-  const data = await res.json();
-  if (!res.ok) { showToast(data.error || 'Failed', 'error'); return; }
-
-  showToast('Session created!', 'success');
-  openSession(data);
-  loadHistory();
-  loadStats();
-}
-
-// ── Open Session ──────────────────────────────────────────────
-function openSession(data) {
-  currentId = data.id;
-  currentSession = data;
-  document.getElementById('createCard').style.display = 'none';
-  document.getElementById('activeCard').style.display = 'block';
-  document.getElementById('activeTitle').textContent = data.title;
-  document.getElementById('qrImg').src = data.qrDataUrl || '';
-  document.getElementById('linkBox').textContent = data.checkinUrl || '';
-
-  refreshAttendance();
-  startTimer(data.expiresAt);
-  connectSSE(data.id);
-}
-
-// ── SSE ───────────────────────────────────────────────────────
-function connectSSE(id) {
-  if (sseSource) sseSource.close();
-  sseSource = new EventSource('/api/sessions/' + id + '/stream');
-  sseSource.addEventListener('checkin', e => {
-    const d = JSON.parse(e.data);
-    showToast(`${d.name} just checked in!`, 'success');
-    refreshAttendance();
-    loadStats();
-  });
-  sseSource.addEventListener('closed', () => refreshAttendance());
-  sseSource.addEventListener('extended', () => refreshAttendance());
-}
-
-// ── Timer ─────────────────────────────────────────────────────
-function startTimer(expiresAt) {
-  if (timerInterval) clearInterval(timerInterval);
-  function tick() {
-    const remaining = expiresAt - Date.now();
-    const badge = document.getElementById('statusBadge');
-    const timer = document.getElementById('timerText');
-    if (remaining <= 0) {
-      badge.textContent = '● CLOSED';
-      badge.className = 'badge badge-closed';
-      timer.textContent = 'Expired';
-      clearInterval(timerInterval);
-      return;
-    }
-    badge.textContent = '● LIVE';
-    badge.className = 'badge badge-live';
-    const m = Math.floor(remaining / 60000);
-    const s = Math.floor((remaining % 60000) / 1000);
-    timer.textContent = `${m}m ${s < 10 ? '0' : ''}${s}s remaining`;
-  }
-  tick();
-  timerInterval = setInterval(tick, 1000);
-}
-
-// ── Attendance ────────────────────────────────────────────────
-async function refreshAttendance() {
-  if (!currentId) return;
-  const res = await fetch('/api/sessions/' + currentId);
-  const session = await res.json();
-  if (!res.ok) return;
-  currentSession = session;
-  allAttendees = session.attendance.slice().reverse();
-
-  document.getElementById('countNum').textContent = session.attendance.length;
-  startTimer(session.expiresAt);
-  renderAttendees(allAttendees);
-}
-
-function renderAttendees(list) {
-  const ul = document.getElementById('attendeeList');
-  if (list.length === 0) {
-    ul.innerHTML = '<li class="empty-state">No check-ins yet</li>';
-    return;
-  }
-  ul.innerHTML = list.map((a, i) => `
-    <li class="attendee-item">
-      <div class="attendee-info">
-        <span class="attendee-num">${list.length - i}</span>
-        <div>
-          <div class="attendee-name">${esc(a.name)}</div>
-          <div class="attendee-reg">${esc(a.regNumber)}</div>
-        </div>
-      </div>
-      <div class="attendee-time">${new Date(a.timestamp).toLocaleTimeString()}</div>
-    </li>
-  `).join('');
-}
-
-function filterAttendees() {
-  const q = document.getElementById('searchInput').value.toLowerCase();
-  if (!q) { renderAttendees(allAttendees); return; }
-  renderAttendees(allAttendees.filter(a =>
-    a.name.toLowerCase().includes(q) || a.regNumber.toLowerCase().includes(q)
-  ));
-}
-
-// ── Session Actions ───────────────────────────────────────────
-async function extendSession() {
-  const res = await fetch('/api/sessions/' + currentId + '/extend', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin: adminPin, additionalMinutes: 30 })
-  });
-  if (res.ok) {
-    showToast('Extended by 30 minutes', 'success');
-    refreshAttendance();
-  }
-}
-
-async function closeSession() {
-  if (!confirm('Close this session now? Students won\'t be able to check in.')) return;
-  const res = await fetch('/api/sessions/' + currentId + '/close', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin: adminPin })
-  });
-  if (res.ok) {
-    showToast('Session closed', 'info');
-    refreshAttendance();
-  }
-}
-
-async function deleteSession(id) {
-  if (!confirm('Delete this session permanently?')) return;
-  const res = await fetch('/api/sessions/' + id, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin: adminPin })
-  });
-  if (res.ok) {
-    showToast('Session deleted', 'info');
-    loadHistory();
-    loadStats();
-    if (currentId === id) goHome();
-  }
-}
-
-function exportCsv() {
-  if (currentId) window.location.href = '/api/sessions/' + currentId + '/export';
-}
-
-function copyLink() {
-  const link = document.getElementById('linkBox').textContent;
-  navigator.clipboard.writeText(link).then(() => showToast('Link copied!', 'success'));
-}
-
-function goHome() {
-  currentId = null;
-  currentSession = null;
-  if (sseSource) { sseSource.close(); sseSource = null; }
-  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-  document.getElementById('createCard').style.display = 'block';
-  document.getElementById('activeCard').style.display = 'none';
-  document.getElementById('title').value = '';
-}
-
-// ── History ───────────────────────────────────────────────────
-async function loadHistory() {
-  const res = await fetch('/api/sessions');
-  const sessions = await res.json();
-  const el = document.getElementById('historyList');
-  if (sessions.length === 0) {
-    el.innerHTML = '<div class="empty-state">No sessions yet. Create your first one above!</div>';
-    return;
-  }
-  el.innerHTML = sessions.map(s => {
-    const isLive = Date.now() < s.expiresAt;
-    const date = new Date(s.createdAt);
-    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    return `
-    <div class="history-item" onclick="loadSessionQr('${s.id}')">
-      <div class="history-left">
-        <div class="history-title">${esc(s.title)}</div>
-        <div class="history-meta">${dateStr} · ${s.count} attendee${s.count !== 1 ? 's' : ''} · ${s.durationMinutes || 120}min</div>
-      </div>
-      <div class="history-right">
-        <span class="badge ${isLive ? 'badge-live' : 'badge-closed'}">${isLive ? '● Live' : '● Closed'}</span>
-        <button class="btn-delete" onclick="event.stopPropagation(); deleteSession('${s.id}')" title="Delete">🗑</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function loadSessionQr(id) {
-  const [qrRes, sRes] = await Promise.all([
-    fetch('/api/sessions/' + id + '/qr'),
-    fetch('/api/sessions/' + id)
-  ]);
-  const qrData = await qrRes.json();
-  const session = await sRes.json();
-  if (!qrRes.ok || !sRes.ok) { showToast('Could not load session', 'error'); return; }
-  openSession({ ...session, qrDataUrl: qrData.qrDataUrl, checkinUrl: qrData.checkinUrl });
-}
-
-function esc(str) {
-  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
-
-</script>
+<script src="admin.js"></script>
 </body>
 </html>

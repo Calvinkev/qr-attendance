@@ -477,3 +477,102 @@ body {
   border-radius: var(--radius-sm);
   font-size: 14px;
 }
+
+/* ── Tabs ──────────────────────────────────────────────────────── */
+.tab-btn.active { border-color: var(--accent); background: var(--surface-2); }
+.tab-content { animation: fadeSlideIn 0.3s ease; }
+
+/* ── Select ────────────────────────────────────────────────────── */
+.select-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  appearance: none;
+  cursor: pointer;
+}
+.select-input:focus { outline: none; border-color: var(--accent); }
+
+/* ── Checkbox ──────────────────────────────────────────────────── */
+.checkbox-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text-secondary); cursor: pointer;
+}
+.checkbox-label input[type="checkbox"] {
+  width: 16px; height: 16px; accent-color: var(--accent);
+}
+
+/* ── Textarea ──────────────────────────────────────────────────── */
+.textarea-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+  resize: vertical;
+}
+.textarea-input:focus { outline: none; border-color: var(--accent); }
+
+/* ── QR Rotate Info ────────────────────────────────────────────── */
+.qr-rotate-info {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 10px;
+  opacity: 0.7;
+}
+
+/* ── Reports ───────────────────────────────────────────────────── */
+.report-summary {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+}
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.report-table th {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.report-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.rate-bar {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  height: 20px;
+  overflow: hidden;
+  position: relative;
+  min-width: 80px;
+}
+.rate-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+.rate-bar span {
+  position: absolute;
+  right: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}
