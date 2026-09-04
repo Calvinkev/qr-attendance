@@ -43,8 +43,14 @@ function saveDB(db) {
 
 function getBaseUrl(req) {
   const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-  const host = req.get('host');
-  return `${protocol}://${host}`;
+  const reqHost = req.get('host');
+
+  // If accessed via localhost/127.0.0.1, swap in the LAN IP so QR codes work on phones
+  if (reqHost.startsWith('localhost') || reqHost.startsWith('127.0.0.1')) {
+    const port = reqHost.split(':')[1] || PORT;
+    return `${protocol}://${getLocalIP()}:${port}`;
+  }
+  return `${protocol}://${reqHost}`;
 }
 
 // ── SSE broadcast ─────────────────────────────────────────────────
