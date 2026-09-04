@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: qr-attendance
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ADMIN_PIN
+        value: 1234
