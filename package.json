@@ -1,0 +1,16 @@
+{
+  "name": "qr-attendance",
+  "version": "1.0.0",
+  "description": "QR code based attendance system for sessions",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "qrcode": "^1.5.3"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
